@@ -33,7 +33,19 @@ class Line(Entity):
         return self.transform(pts)
 
 class CircArc(Entity):
-    """Circular arc segment (100).. often paired with a Transformation Matrix because it's 2D."""    
+    """
+        Circular arc segment (100)
+        Often paired with a Transformation Matrix because it's 2D.
+
+        A circular arc determines unique arc endpoints and an arc center point
+        (the center of the parentcircle). By considering the arc end points to
+        be enumerated and listed in an ordered manner, startpoint first, foll-
+        -owed by terminate point, a direction with respect to definition space
+        can be associatedwith the arc.
+
+        The ordering of the end points corresponds to the ordering necessary 
+        for the arc to betraced out in a counterclockwise direction.
+        """    
 
     def add_parameters(self, parameters):
         # The order isn't a typo.
@@ -59,17 +71,20 @@ class CircArc(Entity):
     def radius(self):
         return math.hypot(self.x1-self.x, self.y1-self.y)
 
-    def theta1(self):
-        return math.atan2(self.x1-self.x, self.y1-self.y)
-
-    def theta2(self):
-        return math.atan2(self.x2-self.x, self.y2-self.y)
+    def thetas(self):
+        theta1 = math.atan2(self.y1-self.y, self.x1-self.x)
+        theta2 = math.atan2(self.y2-self.y, self.x2-self.x)
+        # because the arc is traced CCW, theta2 must be > theta1.
+        while theta2 < theta1:
+            theta2 += math.pi*2
+        return (theta1, theta2)
 
     def linspace(self, n_points):
-        theta = np.linspace(self.theta2(), self.theta1(), n_points)
+        thetas = self.thetas()
+        theta = np.linspace(thetas[0], thetas[1], n_points)
         r = self.radius()
 
-        pts = np.vstack((np.sin(theta)*r, np.cos(theta)*r, np.full((1, n_points), self.z)))
+        pts = np.vstack((np.cos(theta)*r, np.sin(theta)*r, np.full((1, n_points), self.z)))
 
         return self.transform(pts)
 
