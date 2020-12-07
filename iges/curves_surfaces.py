@@ -1,23 +1,61 @@
 #!/usr/bin/env python
 from .entity import Entity
 import os
+import numpy as np
 
 class Line(Entity):
-    """Straight line segment"""
+    """Straight line segment (110)"""
 
     def add_parameters(self, parameters):
-        self.x1 = float(parameters[1])
-        self.y1 = float(parameters[2])
-        self.z1 = float(parameters[3])
-        self.x2 = float(parameters[4])
-        self.y2 = float(parameters[5])
-        self.z2 = float(parameters[6])
+        self.p1 = np.array(parameters[1:4])
+        self.p2 = np.array(parameters[4:7])
 
     def __str__(self):
         s = '--- Line ---' + os.linesep
         s += Entity.__str__(self) + os.linesep
-        s += "From point {0}, {1}, {2} {3}".format(self.x1, self.y1, self.z1, os.linesep)
-        s += "To point {0}, {1}, {2}".format(self.x2, self.y2, self.z2)
+        s += "From point {0}, {1}, {2} {3}".format(self.p1[0], self.p1[1], self.p1[2], os.linesep)
+        s += "To point {0}, {1}, {2}".format(self.p2[0], self.p2[1], self.p2[2])
+        return s
+
+    def __repr__(self):
+        s = 'Line'
+        s += " ({0}, {1}, {2}) -- ".format(self.p1[0], self.p1[1], self.p1[2])
+        s += "({0}, {1}, {2})".format(self.p2[0], self.p2[1], self.p2[2])
+        return s
+
+class CircArc(Entity):
+    """Circular arc segment (100).. often paired with a Transformation Matrix because it's 2D."""    
+
+    def add_parameters(self, parameters):
+        # The order isn't a typo. z is displacement on xt,yt plane
+        self.z = float(parameters[1])
+        self.x = float(parameters[2])
+        self.y = float(parameters[3])
+
+        self.x1 = float(parameters[4])
+        self.y1 = float(parameters[5])
+        self.x2 = float(parameters[6])
+        self.y2 = float(parameters[7])
+
+    def __repr__(self):
+        s = 'CircArc '
+        s+= "[{0}, {1} / {2}] / ".format(self.x, self.y, self.z)
+        s+= "({0}, {1})--({2}, {3})".format(self.x1, self.y1, self.x2, self.y2)
+        s+= "T({0})".format(repr(self.transform))
+        return s
+
+class TransformationMatrix(Entity):
+    """Transformation Matrix (124)"""
+
+    def add_parameters(self, p):
+        self.R = np.array([[p[1], p[2], p[3]], [p[5], p[6], p[7]], [p[9], p[10], p[11]]])
+        self.T = np.array([p[4], p[8], p[12]])
+        # E_T = R*E + T
+
+    def __repr__(self):
+        s = 'TransformationMatrix '
+        s += 'R = ' + repr(self.R)
+        s += 'T = ' + repr(self.T)
         return s
 
 class RationalBSplineCurve(Entity):

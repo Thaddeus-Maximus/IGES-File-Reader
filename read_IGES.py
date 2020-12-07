@@ -6,7 +6,7 @@ from iges.entity import *   # or this
 # http://ts.nist.gov/Standards/IGES/specfigures/index.cfm
 
 # Setup
-fileName = 'revB_alveolus_v5a_export.igs'
+fileName = 'tubes_splined.iges'
 #fileName = 'F126x.igs'
 
 # Load
@@ -47,7 +47,7 @@ for line in f.readlines():
             entity_type_number = int(data[0:8].strip())
             # Curve and surface entities.  See IGES spec v5.3, p. 38, Table 3
             if entity_type_number == 100:   # Circular arc
-                e = Entity()
+                e = CircArc()
             elif entity_type_number == 102: # Composite curve
                 e = Entity()
             elif entity_type_number == 104: # Conic arc
@@ -69,7 +69,7 @@ for line in f.readlines():
             elif entity_type_number == 122: # Tabulated cylinder
                 e = Entity()
             elif entity_type_number == 124: # Transformation matrix
-                e = Entity()
+                e = TransformationMatrix()
             elif entity_type_number == 126: # Rational B-spline curve
                 e = RationalBSplineCurve()
             elif entity_type_number == 128: # Rational B-spline surface
@@ -106,6 +106,11 @@ for line in f.readlines():
             e.add_section(data[65:72], 'status_number')
             e.sequence_number = int(data[73:].strip())
 
+            # Get transformations and bring them along for the ride
+            if e.d['transform']:
+                e.transform = entity_list[pointer_dict[e.d['transform']]]
+
+
             first_dict_line = False
         else:
             e.add_section(data[8:16], 'line_weight_number')
@@ -139,7 +144,6 @@ for line in f.readlines():
         pass
 f.close()
 
-for entity in entity_list:
-    if entity.d['entity_type_number'] == 126:
-        print(entity)
+for i, entity in enumerate(entity_list):
+    print(i, entity.sequence_number, repr(entity))
 
