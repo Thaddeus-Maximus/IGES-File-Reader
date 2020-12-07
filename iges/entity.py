@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import os
-from constants import line_font_pattern
+from .constants import line_font_pattern
 
 def process_global_section(global_string):
-    print global_string
+    print(global_string)
 
 
 class Entity():

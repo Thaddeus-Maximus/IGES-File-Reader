@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from entity import Entity
+from .entity import Entity
 import os
 
 class Line(Entity):

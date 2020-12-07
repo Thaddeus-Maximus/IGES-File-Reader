@@ -141,5 +141,5 @@ f.close()
 
 for entity in entity_list:
     if entity.d['entity_type_number'] == 126:
-        print entity
+        print(entity)
 
