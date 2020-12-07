@@ -106,9 +106,9 @@ for line in f.readlines():
             e.add_section(data[65:72], 'status_number')
             e.sequence_number = int(data[73:].strip())
 
-            # Get transformations and bring them along for the ride
+            # Get transformations and bring them along for the ride, if they exist
             if e.d['transform']:
-                e.transform = entity_list[pointer_dict[e.d['transform']]]
+                e.transformation = entity_list[pointer_dict[e.d['transform']]]
 
 
             first_dict_line = False
@@ -144,6 +144,17 @@ for line in f.readlines():
         pass
 f.close()
 
+import matplotlib
+import matplotlib.pyplot as plt
+fig = plt.figure()
+ax  = fig.add_subplot(111, projection='3d')
+ax.set_aspect('auto')
+
 for i, entity in enumerate(entity_list):
     print(i, entity.sequence_number, repr(entity))
-
+    if type(entity) == CircArc or type(entity) == Line:
+        lsp = entity.linspace(20)
+        print(lsp)
+        plt.plot(lsp[0,:], lsp[1,:], lsp[2,:])
+        
+plt.show()

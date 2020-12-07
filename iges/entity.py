@@ -9,6 +9,7 @@ def process_global_section(global_string):
 class Entity():
     def __init__(self):
         self.d = dict()
+        self.transformation = None
 
     def add_section(self, string, key, type='int'):
         string = string.strip()
@@ -19,6 +20,13 @@ class Entity():
                 self.d[key] = int(string)
             else:
                 self.d[key] = None
+
+    def transform(self, pt):
+        # pt is a column vector
+        if self.transformation is None:
+            return pt
+
+        return self.transformation.transform(pt)
 
     def __str__(self):
         s = "----- Entity -----" + os.linesep

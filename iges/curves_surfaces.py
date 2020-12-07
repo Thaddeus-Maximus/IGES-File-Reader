@@ -2,13 +2,16 @@
 from .entity import Entity
 import os
 import numpy as np
+import math
 
 class Line(Entity):
     """Straight line segment (110)"""
 
     def add_parameters(self, parameters):
-        self.p1 = np.array(parameters[1:4])
-        self.p2 = np.array(parameters[4:7])
+        p = [float(param.strip()) for param in parameters]
+
+        self.p1 = np.array(p[1:4])
+        self.p2 = np.array(p[4:7])
 
     def __str__(self):
         s = '--- Line ---' + os.linesep
@@ -23,15 +26,24 @@ class Line(Entity):
         s += "({0}, {1}, {2})".format(self.p2[0], self.p2[1], self.p2[2])
         return s
 
+    def linspace(self, n_points):
+        t = np.linspace(0.0, 1.0, n_points)
+        pts = np.outer(self.p1, 1-t) + np.outer(self.p2, t)
+        print(pts)
+        return self.transform(pts)
+
 class CircArc(Entity):
     """Circular arc segment (100).. often paired with a Transformation Matrix because it's 2D."""    
 
     def add_parameters(self, parameters):
-        # The order isn't a typo. z is displacement on xt,yt plane
+        # The order isn't a typo.
+        # z is displacement on xt,yt plane
         self.z = float(parameters[1])
+        # x and y are center coordinates
         self.x = float(parameters[2])
         self.y = float(parameters[3])
 
+        # x1,y1 are start, x2,y2 are end
         self.x1 = float(parameters[4])
         self.y1 = float(parameters[5])
         self.x2 = float(parameters[6])
@@ -41,16 +53,41 @@ class CircArc(Entity):
         s = 'CircArc '
         s+= "[{0}, {1} / {2}] / ".format(self.x, self.y, self.z)
         s+= "({0}, {1})--({2}, {3})".format(self.x1, self.y1, self.x2, self.y2)
-        s+= "T({0})".format(repr(self.transform))
+        s+= "T({0})".format(repr(self.transformation))
         return s
+
+    def radius(self):
+        return math.hypot(self.x1-self.x, self.y1-self.y)
+
+    def theta1(self):
+        return math.atan2(self.x1-self.x, self.y1-self.y)
+
+    def theta2(self):
+        return math.atan2(self.x2-self.x, self.y2-self.y)
+
+    def linspace(self, n_points):
+        theta = np.linspace(self.theta2(), self.theta1(), n_points)
+        r = self.radius()
+
+        pts = np.vstack((np.sin(theta)*r, np.cos(theta)*r, np.full((1, n_points), self.z)))
+
+        return self.transform(pts)
+
+    def arange(self):
+        pass
 
 class TransformationMatrix(Entity):
     """Transformation Matrix (124)"""
 
-    def add_parameters(self, p):
+    def add_parameters(self, parameters):
+        p = [float(param.strip()) for param in parameters]
         self.R = np.array([[p[1], p[2], p[3]], [p[5], p[6], p[7]], [p[9], p[10], p[11]]])
-        self.T = np.array([p[4], p[8], p[12]])
+        self.T = np.array([p[4], p[8], p[12]]).reshape((3,1))
         # E_T = R*E + T
+
+    def transform(self, pt):
+        print("TransformationMatrix.transform")
+        return np.matmul(self.R, pt) + self.T
 
     def __repr__(self):
         s = 'TransformationMatrix '
