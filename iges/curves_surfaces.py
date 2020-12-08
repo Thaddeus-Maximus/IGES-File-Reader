@@ -29,8 +29,28 @@ class Line(Entity):
     def linspace(self, n_points):
         t = np.linspace(0.0, 1.0, n_points)
         pts = np.outer(self.p1, 1-t) + np.outer(self.p2, t)
-        print(pts)
         return self.transform(pts)
+
+class CompCurve(Entity):
+    """ Composite curve (102) """
+    def add_parameters(self, parameters):
+        self.n_curves = int(parameters[1].strip())
+        self.pointers = []
+        for i in range(2, self.n_curves+2):
+            self.pointers.append(int(parameters[i].strip()))
+
+    def add_children(self, children):
+        # We're going to add child references directly. Parameters aren't real, here.
+        self.children = children
+
+    def __repr__(self):
+        s = 'CompCurve ('
+        s+=', '.join([repr(child) for child in self.children])
+        s+=')'
+        return s
+
+    def linspace(self, n_points):
+        return np.hstack([child.linspace(n_points) for child in self.children])
 
 class CircArc(Entity):
     """
@@ -101,7 +121,6 @@ class TransformationMatrix(Entity):
         # E_T = R*E + T
 
     def transform(self, pt):
-        print("TransformationMatrix.transform")
         return np.matmul(self.R, pt) + self.T
 
     def __repr__(self):
