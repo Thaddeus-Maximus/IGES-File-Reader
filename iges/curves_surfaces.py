@@ -149,6 +149,7 @@ class CompCurve(Entity):
             self.pointers.append(int(parameters[i].strip()))
 
     def add_children(self, children, EPSILON = 1e-5):
+        """ This algorithm isn't the greatest. It's at least O(n^2) """
         self.children = []
         
         comb = combinations(range(len(children)), 2)
@@ -168,7 +169,7 @@ class CompCurve(Entity):
             dists[(b, 1)][(a, 2)] = dists[(a, 2)][(b, 1)] = np.linalg.norm(children[a].e2-children[b].e1)
             dists[(b, 2)][(a, 2)] = dists[(a, 2)][(b, 2)] = np.linalg.norm(children[a].e2-children[b].e2)
 
-        # at this point we know all the distances from every node. ʘ‿ʘ
+        # at this point we know all the distances from every node.
 
         # pick a point to be the "starter". If we find an open node we'll change this later.
         step = (0,1)
@@ -221,7 +222,7 @@ class CompCurve(Entity):
 class AssociativityInstance(Entity):
     """
     Associativity Instance Entity (Type 402)
-    To be honest, I don't understand this either, but SW seems to use it rather than composite curves.
+    To be honest, I don't fully grok this, but SW seems to use it rather than composite curves.
 
     Index Name Type Description
     1 N Integer Number of entries
@@ -239,6 +240,7 @@ class AssociativityInstance(Entity):
                 self.pointers.append(int(parameters[i].strip()))
 
     def add_children(self, children, EPSILON = 1e-5):
+        """ This algorithm isn't the greatest. It's at least O(n^2) """
         self.children = []
         
         comb = combinations(range(len(children)), 2)
@@ -258,7 +260,7 @@ class AssociativityInstance(Entity):
             dists[(b, 1)][(a, 2)] = dists[(a, 2)][(b, 1)] = np.linalg.norm(children[a].e2-children[b].e1)
             dists[(b, 2)][(a, 2)] = dists[(a, 2)][(b, 2)] = np.linalg.norm(children[a].e2-children[b].e2)
 
-        # at this point we know all the distances from every node. ʘ‿ʘ
+        # at this point we know all the distances from every node.
 
         # pick a point to be the "starter". If we find an open node we'll change this later.
         step = (0,1)

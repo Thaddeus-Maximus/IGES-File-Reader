@@ -18,8 +18,6 @@ Order of priority for reading entities:
 - Lines
 - Arcs
 - Composite curves
-- Conic arcs
-- Rational B-spline curves
 
 I may also want the ability to 'split' entities at connecting points... but that does seem like it'd fall into the realm of post-processing and is outside this module's scope.
 
