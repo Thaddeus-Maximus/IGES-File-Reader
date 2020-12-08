@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from .constants import line_font_pattern
+from iges.constants import line_font_pattern
 
 def process_global_section(global_string):
     print(global_string)

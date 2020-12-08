@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from .entity import Entity
+from iges.entity import Entity
 import os
 import numpy as np
 import math
