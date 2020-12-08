@@ -10,8 +10,12 @@ class Line(Entity):
     def add_parameters(self, parameters):
         p = [float(param.strip()) for param in parameters]
 
-        self.p1 = np.array(p[1:4])
-        self.p2 = np.array(p[4:7])
+        self.p1 = np.array(p[1:4]).reshape(3,1)
+        self.p2 = np.array(p[4:7]).reshape(3,1)
+
+        self.e1 = None
+        self.e2 = None
+        self.compute_endpoints()
 
     def __str__(self):
         s = '--- Line ---' + os.linesep
@@ -26,31 +30,28 @@ class Line(Entity):
         s += "({0}, {1}, {2})".format(self.p2[0], self.p2[1], self.p2[2])
         return s
 
-    def linspace(self, n_points):
-        t = np.linspace(0.0, 1.0, n_points)
+    def reverse(self):
+        self.p1, self.p2 = self.p2, self.p1
+        self.compute_endpoints()
+        return self
+
+    def compute_endpoints(self):
+        self.e1 = self.transform(self.p1)
+        self.e2 = self.transform(self.p2)
+        return self.e1, self.e2
+
+    def linspace(self, n_points, endpoint=True):
+        t = np.linspace(0.0, 1.0, n_points, endpoint=endpoint)
         pts = np.outer(self.p1, 1-t) + np.outer(self.p2, t)
         return self.transform(pts)
 
-class CompCurve(Entity):
-    """ Composite curve (102) """
-    def add_parameters(self, parameters):
-        self.n_curves = int(parameters[1].strip())
-        self.pointers = []
-        for i in range(2, self.n_curves+2):
-            self.pointers.append(int(parameters[i].strip()))
+    def length(self):
+        #return math.hypot(self.p1[0]-self.p2[0], self.p1[1]-self.p2[1], self.p1[2]-self.p2[2])
+        return np.linalg.norm(self.p1-self.p2, ord=2)
 
-    def add_children(self, children):
-        # We're going to add child references directly. Parameters aren't real, here.
-        self.children = children
-
-    def __repr__(self):
-        s = 'CompCurve ('
-        s+=', '.join([repr(child) for child in self.children])
-        s+=')'
-        return s
-
-    def linspace(self, n_points):
-        return np.hstack([child.linspace(n_points) for child in self.children])
+    def arange(self, dx, endpoint=False):
+        n = math.ceil(self.length()/dx)
+        return self.linspace(n, endpoint)
 
 class CircArc(Entity):
     """
@@ -81,6 +82,12 @@ class CircArc(Entity):
         self.x2 = float(parameters[6])
         self.y2 = float(parameters[7])
 
+        self.reversed = False
+
+        self.e1 = None
+        self.e2 = None
+        self.compute_endpoints()
+
     def __repr__(self):
         s = 'CircArc '
         s+= "[{0}, {1} / {2}] / ".format(self.x, self.y, self.z)
@@ -91,25 +98,167 @@ class CircArc(Entity):
     def radius(self):
         return math.hypot(self.x1-self.x, self.y1-self.y)
 
+    def reverse(self):
+        self.x1, self.x2 = self.x2, self.x1
+        self.y1, self.y2 = self.y2, self.y1
+        self.reversed = True
+        self.compute_endpoints()
+        return self
+
     def thetas(self):
         theta1 = math.atan2(self.y1-self.y, self.x1-self.x)
         theta2 = math.atan2(self.y2-self.y, self.x2-self.x)
-        # because the arc is traced CCW, theta2 must be > theta1.
-        while theta2 < theta1:
-            theta2 += math.pi*2
+        # because the arc is traced CCW, theta2 must be > theta1.. unless reversed
+        if self.reversed:
+            while theta2 > theta1:
+                theta2 -= math.pi*2
+        else:
+            while theta2 < theta1:
+                theta2 += math.pi*2
         return (theta1, theta2)
 
-    def linspace(self, n_points):
+    def compute_endpoints(self):
+        self.e1 = self.transform(np.array([self.x1, self.y1, self.z]).reshape(3,1))
+        self.e2 = self.transform(np.array([self.x2, self.y2, self.z]).reshape(3,1))
+        return self.e1, self.e2
+
+    def length(self):
         thetas = self.thetas()
-        theta = np.linspace(thetas[0], thetas[1], n_points)
+        return abs(thetas[0]-thetas[1])*self.radius()
+
+    def linspace(self, n_points, endpoint=True):
+        thetas = self.thetas()
+        theta = np.linspace(thetas[0], thetas[1], n_points, endpoint=endpoint)
         r = self.radius()
 
-        pts = np.vstack((np.cos(theta)*r, np.sin(theta)*r, np.full((1, n_points), self.z)))
+        pts = np.vstack((self.x+np.cos(theta)*r, self.y+np.sin(theta)*r, np.full((1, n_points), self.z)))
 
         return self.transform(pts)
 
-    def arange(self):
-        pass
+    def arange(self, dx, endpoint=False):
+        n = math.ceil(self.length()/dx)
+        return self.linspace(n, endpoint)
+
+class CompCurve(Entity):
+    """ Composite curve (102) """
+    def add_parameters(self, parameters):
+        self.n_curves = int(parameters[1].strip())
+        self.pointers = []
+        for i in range(2, self.n_curves+2):
+            self.pointers.append(int(parameters[i].strip()))
+
+    def add_children(self, children, EPSILON = 1e-5):
+        self.open = True
+        self.children = [children[0]]
+        actpt = children[0].e2
+
+        if np.linalg.norm(children[1].e1 - actpt, ord=2) > EPSILON and np.linalg.norm(children[1].e2 - actpt, ord=2) > EPSILON:
+            children[0].reverse()
+            actpt = children[0].e2
+            if np.linalg.norm(children[1].e1 - actpt, ord=2) > EPSILON and np.linalg.norm(children[1].e2 - actpt, ord=2) > EPSILON:
+                raise Exception("Couldn't stitch composite curve together.")
+
+        
+        for i in range(1, len(children)):
+            if np.linalg.norm(children[i].e1 - actpt, ord=2) < np.linalg.norm(children[i].e2 - actpt, ord=2):
+                # e1 closer, good, no worries
+                self.children.append(children[i])
+                actpt = children[i].e2
+            else:
+                self.children.append(children[i].reverse())
+                actpt = children[i].e2 # reverse isn't functional
+
+    def __repr__(self):
+        s = 'CompCurve ('
+        s+=', '.join([repr(child) for child in self.children])
+        s+=')'
+        return s
+
+    def length(self):
+        return sum([child.length() for child in self.children])
+
+    def linspace(self, n_points, endpoint=True):
+        return np.hstack([child.linspace(n_points) for child in self.children])
+
+    def arange(self, dx, endpoint=False):
+        stack = []
+        for i, child in enumerate(self.children):
+            if i == len(self.children)-1:
+                stack.append(child.arange(dx, endpoint=endpoint))
+            else:
+                stack.append(child.arange(dx, endpoint=False))
+        return np.hstack(stack)
+
+class AssociativityInstance(Entity):
+    """
+    Associativity Instance Entity (Type 402)
+    To be honest, I don't understand this either, but SW seems to use it rather than composite curves.
+
+    Index Name Type Description
+    1 N Integer Number of entries
+    2 DE(1) Pointer Pointer to the DE of the first entity
+    .. .. . .
+    1+N DE(N) Pointer Pointer to the DE of the last entity
+
+    """
+
+    def add_parameters(self, parameters):
+        if self.d['form_number'] == 15: # Ordered Group, no Back Pointers Associativity
+            self.n_curves = int(parameters[1].strip())
+            self.pointers = []
+            for i in range(2, self.n_curves+2):
+                self.pointers.append(int(parameters[i].strip()))
+
+    def add_children(self, children, EPSILON = 1e-5):
+        self.open = True
+        self.children = [children[0]]
+        actpt = children[0].e2
+
+        '''if np.linalg.norm(children[1].e1 - actpt, ord=2) > EPSILON and np.linalg.norm(children[1].e2 - actpt, ord=2) > EPSILON:
+            children[0].reverse()
+            actpt = children[0].e2
+            if np.linalg.norm(children[1].e1 - actpt, ord=2) > EPSILON and np.linalg.norm(children[1].e2 - actpt, ord=2) > EPSILON:
+                raise Exception("Couldn't stitch composite curve together.")'''
+        # TODO: I think SW is lying about saying that it's using form 14/15... these don't really seem ordered....
+
+        
+        for i in range(1, len(children)):
+            if np.linalg.norm(children[i].e1 - actpt, ord=2) < np.linalg.norm(children[i].e2 - actpt, ord=2):
+                # e1 closer, good, no worries
+                self.children.append(children[i])
+                actpt = children[i].e2
+            else:
+                self.children.append(children[i].reverse())
+                actpt = children[i].e2 # reverse isn't functional
+
+    def __repr__(self):
+        s = 'CompCurve ('
+        s+=', '.join([repr(child) for child in self.children])
+        s+=')'
+        return s
+
+    def length(self):
+        return sum([child.length() for child in self.children])
+
+    def linspace(self, n_points, endpoint=True):
+        print([type(child) for child in self.children])
+        return np.hstack([child.linspace(n_points) for child in self.children])
+
+    def arange(self, dx, endpoint=False):
+        stack = []
+        for i, child in enumerate(self.children):
+            if i == len(self.children)-1:
+                stack.append(child.arange(dx, endpoint=endpoint))
+            else:
+                stack.append(child.arange(dx, endpoint=False))
+        return np.hstack(stack)
+
+class ColorDefinition(Entity):
+    """
+    Color Definition Entity Type (Type 314)
+    """
+
+    pass
 
 class TransformationMatrix(Entity):
     """Transformation Matrix (124)"""
@@ -117,11 +266,12 @@ class TransformationMatrix(Entity):
     def add_parameters(self, parameters):
         p = [float(param.strip()) for param in parameters]
         self.R = np.array([[p[1], p[2], p[3]], [p[5], p[6], p[7]], [p[9], p[10], p[11]]])
-        self.T = np.array([p[4], p[8], p[12]]).reshape((3,1))
+        self.T = np.array([p[4], p[8], p[12]]).reshape(3,1)
         # E_T = R*E + T
 
     def transform(self, pt):
-        return np.matmul(self.R, pt) + self.T
+        out = np.matmul(self.R, pt) + np.broadcast_to(self.T, pt.shape)
+        return out
 
     def __repr__(self):
         s = 'TransformationMatrix '

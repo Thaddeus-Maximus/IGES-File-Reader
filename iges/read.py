@@ -1,5 +1,5 @@
 import os
-from iges.curves_surfaces import Line, CircArc, TransformationMatrix, RationalBSplineCurve, CompCurve
+from iges.curves_surfaces import Line, CircArc, TransformationMatrix, RationalBSplineCurve, CompCurve, AssociativityInstance
 from iges.entity import process_global_section, Entity
 
 class IGES_Object(object):
@@ -87,6 +87,9 @@ class IGES_Object(object):
 					elif  entity_type_number == 132:
 						e = Entity()
 
+					elif  entity_type_number == 402:
+						e = AssociativityInstance()
+
 					else:
 						e = Entity()
 
@@ -141,7 +144,7 @@ class IGES_Object(object):
 
 		# Second pass for references
 		for entity in entity_list:
-			if type(entity) == CompCurve:
+			if type(entity) in [CompCurve, AssociativityInstance]:
 				children = []	
 				for i in range(entity.n_curves):
 					ptr = entity.pointers[i]
