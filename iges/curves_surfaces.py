@@ -210,13 +210,59 @@ class AssociativityInstance(Entity):
                 self.pointers.append(int(parameters[i].strip()))
 
     def add_children(self, children, EPSILON = 1e-5):
-        self.open = True
+        self.children = []
         
-        comb = combinations(range(len(children)))
+        comb = combinations(range(len(children)), 2)
+        dists = {}
+        for c in list(comb):
+            a = c[0]
+            b = c[1]
+            # check a.e1 to b.e1 and b.e2
+            # check a.e2 to b.e1 and b.e2
 
-        print(comb)
+            for x in [(b,1),(b,2),(a,1),(a,2)]:
+                if not x in dists:
+                    dists[x] = {}
 
-        
+            dists[(b, 1)][(a, 1)] = dists[(a, 1)][(b, 1)] = np.linalg.norm(children[a].e1-children[b].e1)
+            dists[(b, 2)][(a, 1)] = dists[(a, 1)][(b, 2)] = np.linalg.norm(children[a].e1-children[b].e2)
+            dists[(b, 1)][(a, 2)] = dists[(a, 2)][(b, 1)] = np.linalg.norm(children[a].e2-children[b].e1)
+            dists[(b, 2)][(a, 2)] = dists[(a, 2)][(b, 2)] = np.linalg.norm(children[a].e2-children[b].e2)
+
+        # at this point we know all the distances from every node. ʘ‿ʘ
+
+        # pick a point to be the "starter". If we find an open node we'll change this later.
+        step = (0,1)
+        connections = {}
+
+        for point in dists:
+            #sorteddists = dict(sorted(dists[point].items(), key=lambda item: item[1]))
+            #this only works in python3.7+
+            
+            bestpt = min(dists[point], key=dists[point].get)
+            a = children[point[0]].e1 if point[1]==1 else children[point[0]].e2
+            b = children[bestpt[0]].e1 if bestpt[1]==1 else children[bestpt[0]].e2
+            if dists[point][bestpt] > 1e-5:
+                step = point
+                connections[point] = None
+            else:
+                connections[point] = bestpt
+
+        original = step
+
+        while True:
+            if step[1] == 2:
+                children[step[0]].reverse()
+            self.children.append(children[step[0]])
+
+            step = (step[0], 1 if step[1]==2 else 2)
+            step = connections[step]
+
+            if step is None or step[0] is original[0]:
+                break
+
+
+
 
     def __repr__(self):
         s = 'CompCurve ('
@@ -228,7 +274,6 @@ class AssociativityInstance(Entity):
         return sum([child.length() for child in self.children])
 
     def linspace(self, n_points, endpoint=True):
-        print([type(child) for child in self.children])
         return np.hstack([child.linspace(n_points) for child in self.children])
 
     def arange(self, dx, endpoint=False):
