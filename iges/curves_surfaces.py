@@ -3,6 +3,7 @@ from .entity import Entity
 import os
 import numpy as np
 import math
+from itertools import combinations
 
 class Line(Entity):
     """Straight line segment (110)"""
@@ -157,7 +158,6 @@ class CompCurve(Entity):
             actpt = children[0].e2
             if np.linalg.norm(children[1].e1 - actpt, ord=2) > EPSILON and np.linalg.norm(children[1].e2 - actpt, ord=2) > EPSILON:
                 raise Exception("Couldn't stitch composite curve together.")
-
         
         for i in range(1, len(children)):
             if np.linalg.norm(children[i].e1 - actpt, ord=2) < np.linalg.norm(children[i].e2 - actpt, ord=2):
@@ -211,25 +211,12 @@ class AssociativityInstance(Entity):
 
     def add_children(self, children, EPSILON = 1e-5):
         self.open = True
-        self.children = [children[0]]
-        actpt = children[0].e2
+        
+        comb = combinations(range(len(children)))
 
-        '''if np.linalg.norm(children[1].e1 - actpt, ord=2) > EPSILON and np.linalg.norm(children[1].e2 - actpt, ord=2) > EPSILON:
-            children[0].reverse()
-            actpt = children[0].e2
-            if np.linalg.norm(children[1].e1 - actpt, ord=2) > EPSILON and np.linalg.norm(children[1].e2 - actpt, ord=2) > EPSILON:
-                raise Exception("Couldn't stitch composite curve together.")'''
-        # TODO: I think SW is lying about saying that it's using form 14/15... these don't really seem ordered....
+        print(comb)
 
         
-        for i in range(1, len(children)):
-            if np.linalg.norm(children[i].e1 - actpt, ord=2) < np.linalg.norm(children[i].e2 - actpt, ord=2):
-                # e1 closer, good, no worries
-                self.children.append(children[i])
-                actpt = children[i].e2
-            else:
-                self.children.append(children[i].reverse())
-                actpt = children[i].e2 # reverse isn't functional
 
     def __repr__(self):
         s = 'CompCurve ('
