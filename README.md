@@ -26,3 +26,7 @@ I may also want the ability to 'split' entities at connecting points... but that
 Now, why IGES? Because it's the only file format that most CAD packages won't complain about saving wireframes to.
 
 Why not pythonocc? I spent 20 hours trying to figure out how to actually extract information from a CAD file. There are no examples on the internet of how to do this. I'm confused and think I'm wrong too. But this way, the SLOC is lower, no?
+
+# Sample files
+chassis_007_simp.IGS was generated from multiple composite curves in SOLIDWORKS.
+tubes_splined.iges was generated from multiple curves in OnShape.
