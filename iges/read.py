@@ -153,7 +153,7 @@ class IGES_Object(object):
 					toplevel_entities.remove(ent)
 
 				entity.add_children(children)
-				toplevel_entities.append(entity)
+				#toplevel_entities.append(entity)
 		
 		# Save 
 		self.param_string      = param_string

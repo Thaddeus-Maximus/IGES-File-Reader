@@ -21,12 +21,12 @@ class Entity():
             else:
                 self.d[key] = None
 
-    def transform(self, pt):
+    def transform(self, pt, orientation_only=False):
         # pt is a column vector
         if self.transformation is None:
             return pt
 
-        return self.transformation.transform(pt)
+        return self.transformation.transform(pt, orientation_only)
 
     def __str__(self):
         s = "----- Entity -----" + os.linesep

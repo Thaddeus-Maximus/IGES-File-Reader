@@ -16,7 +16,7 @@ class Line(Entity):
 
         self.e1 = None
         self.e2 = None
-        self.compute_endpoints()
+        self.computeEndpoints()
 
     def __str__(self):
         s = '--- Line ---' + os.linesep
@@ -33,10 +33,10 @@ class Line(Entity):
 
     def reverse(self):
         self.p1, self.p2 = self.p2, self.p1
-        self.compute_endpoints()
+        self.computeEndpoints()
         return self
 
-    def compute_endpoints(self):
+    def computeEndpoints(self):
         self.e1 = self.transform(self.p1)
         self.e2 = self.transform(self.p2)
         return self.e1, self.e2
@@ -53,6 +53,23 @@ class Line(Entity):
     def arange(self, dx, endpoint=False):
         n = math.ceil(self.length()/dx)
         return self.linspace(n, endpoint)
+
+    def distToPoint(self, X):
+        p1 = self.p1.reshape(3)
+        p2 = self.p2.reshape(3)
+        p3 = X.reshape(3)
+
+        if np.dot(p1-p2, p1-p3) < 0:
+            # beyond p1
+            d = np.linalg.norm(p3-p1)
+            return d
+        elif np.dot(p2-p1, p2-p3) < 0:
+            # beyond p2
+            d = np.linalg.norm(p3-p2)
+            return d
+        else:
+            d = np.linalg.norm(np.cross(p2-p1, p1-p3))/np.linalg.norm(p2-p1)
+            return d
 
 class CircArc(Entity):
     """
@@ -87,7 +104,7 @@ class CircArc(Entity):
 
         self.e1 = None
         self.e2 = None
-        self.compute_endpoints()
+        self.computeEndpoints()
 
     def __repr__(self):
         s = 'CircArc '
@@ -96,6 +113,43 @@ class CircArc(Entity):
         s+= "T({0})".format(repr(self.transformation))
         return s
 
+    def distToPoint(self, X):
+        # returns distance from this arc segment to the given point (column vector)
+        P = self.transform(np.array([self.x, self.y, self.z]).reshape(3,1)).reshape(3)
+        N = self.transform(np.array([0., 0., 1.]).reshape(3,1), orientation_only=True).reshape(3)
+        v = X.reshape(3)-P.reshape(3)
+
+        vparr = np.dot(v, N)/(np.linalg.norm(N)**2)*N
+        vperp = v - vparr
+
+        Xproj = P + vperp
+
+        daxial  = np.linalg.norm(vparr)
+        dradial = np.linalg.norm(vperp)-self.radius()
+        dtoroid = math.hypot(daxial, dradial)
+
+        va = (self.transform(np.array([self.x1, self.y1, self.z]).reshape(3,1)) - self.transform(np.array([self.x, self.y, self.z]).reshape(3,1))).reshape(3)
+        vb = (self.transform(np.array([self.x2, self.y2, self.z]).reshape(3,1)) - self.transform(np.array([self.x, self.y, self.z]).reshape(3,1))).reshape(3)
+        vc = vperp.reshape(3)
+        thetaE = math.atan2((-1 if self.reversed else +1)*np.dot(np.cross(va, vb), N), np.dot(vb, va))
+        thetaX = math.atan2((-1 if self.reversed else +1)*np.dot(np.cross(va, vc), N), np.dot(vc, va))
+        while thetaX < 0:
+            thetaX += 2*math.pi
+        while thetaE < 0:
+            thetaE += 2*math.pi
+
+        if thetaX <= thetaE:
+            # in the "swept" section
+            return dtoroid
+        elif thetaX-thetaE > 2*math.pi-thetaX:
+            # in a sphere close to startpoint
+            d = np.linalg.norm(X-self.e1)
+            return d
+        else:
+            # in a sphere close to endpoint
+            d = np.linalg.norm(X-self.e2)
+            return d
+
     def radius(self):
         return math.hypot(self.x1-self.x, self.y1-self.y)
 
@@ -103,7 +157,7 @@ class CircArc(Entity):
         self.x1, self.x2 = self.x2, self.x1
         self.y1, self.y2 = self.y2, self.y1
         self.reversed = True
-        self.compute_endpoints()
+        self.computeEndpoints()
         return self
 
     def thetas(self):
@@ -118,7 +172,7 @@ class CircArc(Entity):
                 theta2 += math.pi*2
         return (theta1, theta2)
 
-    def compute_endpoints(self):
+    def computeEndpoints(self):
         self.e1 = self.transform(np.array([self.x1, self.y1, self.z]).reshape(3,1))
         self.e2 = self.transform(np.array([self.x2, self.y2, self.z]).reshape(3,1))
         return self.e1, self.e2
@@ -198,6 +252,13 @@ class CompCurve(Entity):
             if step is None or step[0] is original[0]:
                 break
 
+        self.computeEndpoints()
+
+    def computeEndpoints(self):
+        self.e1 = self.transform(self.children[ 0].e1)
+        self.e2 = self.transform(self.children[-1].e2)
+        return self.e1, self.e2
+
     def __repr__(self):
         s = 'CompCurve ('
         s+=', '.join([repr(child) for child in self.children])
@@ -208,7 +269,13 @@ class CompCurve(Entity):
         return sum([child.length() for child in self.children])
 
     def linspace(self, n_points, endpoint=True):
-        return np.hstack([child.linspace(n_points) for child in self.children])
+        stack = []
+        for i, child in enumerate(self.children):
+            if i == len(self.children)-1:
+                stack.append(child.linspace(n_points, endpoint=endpoint))
+            else:
+                stack.append(child.linspace(n_points, endpoint=False))
+        return np.hstack(stack)
 
     def arange(self, dx, endpoint=False):
         stack = []
@@ -289,6 +356,13 @@ class AssociativityInstance(Entity):
             if step is None or step[0] is original[0]:
                 break
 
+        self.computeEndpoints()
+
+    def computeEndpoints(self):
+        self.e1 = self.transform(self.children[ 0].e1)
+        self.e2 = self.transform(self.children[-1].e2)
+        return self.e1, self.e2
+
     def __repr__(self):
         s = 'CompCurve ('
         s+=', '.join([repr(child) for child in self.children])
@@ -299,7 +373,13 @@ class AssociativityInstance(Entity):
         return sum([child.length() for child in self.children])
 
     def linspace(self, n_points, endpoint=True):
-        return np.hstack([child.linspace(n_points) for child in self.children])
+        stack = []
+        for i, child in enumerate(self.children):
+            if i == len(self.children)-1:
+                stack.append(child.linspace(n_points, endpoint=endpoint))
+            else:
+                stack.append(child.linspace(n_points, endpoint=False))
+        return np.hstack(stack)
 
     def arange(self, dx, endpoint=False):
         stack = []
@@ -326,8 +406,10 @@ class TransformationMatrix(Entity):
         self.T = np.array([p[4], p[8], p[12]]).reshape(3,1)
         # E_T = R*E + T
 
-    def transform(self, pt):
-        out = np.matmul(self.R, pt) + np.broadcast_to(self.T, pt.shape)
+    def transform(self, pt, orientation_only=False):
+        out = np.matmul(self.R, pt)
+        if not orientation_only:
+            out += np.broadcast_to(self.T, pt.shape)
         return out
 
     def __repr__(self):
