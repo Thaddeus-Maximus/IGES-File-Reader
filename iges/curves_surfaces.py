@@ -11,8 +11,8 @@ class Line(Entity):
     def add_parameters(self, parameters):
         p = [float(param.strip()) for param in parameters]
 
-        self.p1 = np.array(p[1:4]).reshape(3,1)
-        self.p2 = np.array(p[4:7]).reshape(3,1)
+        self.p1 = np.array(p[1:4]).reshape(3)
+        self.p2 = np.array(p[4:7]).reshape(3)
 
         self.e1 = None
         self.e2 = None
@@ -54,22 +54,22 @@ class Line(Entity):
         n = math.ceil(self.length()/dx)
         return self.linspace(n, endpoint)
 
-    def distToPoint(self, X):
-        p1 = self.p1.reshape(3)
-        p2 = self.p2.reshape(3)
+    def nearestPoint(self, X):
+        p1 = self.p1
+        p2 = self.p2
         p3 = X.reshape(3)
 
         if np.dot(p1-p2, p1-p3) < 0:
             # beyond p1
             d = np.linalg.norm(p3-p1)
-            return d
+            return (d, self.p1)
         elif np.dot(p2-p1, p2-p3) < 0:
             # beyond p2
             d = np.linalg.norm(p3-p2)
-            return d
+            return (d, self.p2)
         else:
             d = np.linalg.norm(np.cross(p2-p1, p1-p3))/np.linalg.norm(p2-p1)
-            return d
+            return (d, np.dot(p1-p2, p1-p3)/np.linalg.norm(p1-p3))
 
 class CircArc(Entity):
     """
@@ -113,11 +113,12 @@ class CircArc(Entity):
         s+= "T({0})".format(repr(self.transformation))
         return s
 
-    def distToPoint(self, X):
+    def nearestPoint(self, X):
         # returns distance from this arc segment to the given point (column vector)
-        P = self.transform(np.array([self.x, self.y, self.z]).reshape(3,1)).reshape(3)
-        N = self.transform(np.array([0., 0., 1.]).reshape(3,1), orientation_only=True).reshape(3)
-        v = X.reshape(3)-P.reshape(3)
+        P = self.transform(np.array([self.x, self.y, self.z]))
+        N = self.transform(np.array([0., 0., 1.]), orientation_only=True)
+        X = X.reshape(3)
+        v = X - N
 
         vparr = np.dot(v, N)/(np.linalg.norm(N)**2)*N
         vperp = v - vparr
@@ -128,9 +129,9 @@ class CircArc(Entity):
         dradial = np.linalg.norm(vperp)-self.radius()
         dtoroid = math.hypot(daxial, dradial)
 
-        va = (self.transform(np.array([self.x1, self.y1, self.z]).reshape(3,1)) - self.transform(np.array([self.x, self.y, self.z]).reshape(3,1))).reshape(3)
-        vb = (self.transform(np.array([self.x2, self.y2, self.z]).reshape(3,1)) - self.transform(np.array([self.x, self.y, self.z]).reshape(3,1))).reshape(3)
-        vc = vperp.reshape(3)
+        va = (self.transform(np.array([self.x1, self.y1, self.z])) - self.transform(np.array([self.x, self.y, self.z])))
+        vb = (self.transform(np.array([self.x2, self.y2, self.z])) - self.transform(np.array([self.x, self.y, self.z])))
+        vc = vperp
         thetaE = math.atan2((-1 if self.reversed else +1)*np.dot(np.cross(va, vb), N), np.dot(vb, va))
         thetaX = math.atan2((-1 if self.reversed else +1)*np.dot(np.cross(va, vc), N), np.dot(vc, va))
         while thetaX < 0:
@@ -173,8 +174,8 @@ class CircArc(Entity):
         return (theta1, theta2)
 
     def computeEndpoints(self):
-        self.e1 = self.transform(np.array([self.x1, self.y1, self.z]).reshape(3,1))
-        self.e2 = self.transform(np.array([self.x2, self.y2, self.z]).reshape(3,1))
+        self.e1 = self.transform(np.array([self.x1, self.y1, self.z]))
+        self.e2 = self.transform(np.array([self.x2, self.y2, self.z]))
         return self.e1, self.e2
 
     def length(self):
@@ -407,9 +408,12 @@ class TransformationMatrix(Entity):
         # E_T = R*E + T
 
     def transform(self, pt, orientation_only=False):
+        pt = pt.reshape(3, -1)
         out = np.matmul(self.R, pt)
         if not orientation_only:
             out += np.broadcast_to(self.T, pt.shape)
+        if pt.shape[1] == 1:
+            out = out.reshape(3) # back into 1D vector
         return out
 
     def __repr__(self):
