@@ -5,6 +5,8 @@ import numpy as np
 import math
 from itertools import combinations
 
+EPSILON = 1e-5
+
 class Line(Entity):
     """Straight line segment (110)"""
 
@@ -59,17 +61,17 @@ class Line(Entity):
         p2 = self.p2
         p3 = X.reshape(3)
 
-        if np.dot(p1-p2, p1-p3) < 0:
+        if np.dot(p1-p2, p1-p3) <= EPSILON:
             # beyond p1
             d = np.linalg.norm(p3-p1)
-            return (d, self.p1)
-        elif np.dot(p2-p1, p2-p3) < 0:
+            return (d, self.p1, 1)
+        elif np.dot(p2-p1, p2-p3) <= EPSILON:
             # beyond p2
             d = np.linalg.norm(p3-p2)
-            return (d, self.p2)
+            return (d, self.p2, 2)
         else:
             d = np.linalg.norm(np.cross(p2-p1, p1-p3))/np.linalg.norm(p2-p1)
-            return (d, np.dot(p1-p2, p1-p3)/np.linalg.norm(p1-p3))
+            return (d, p1+(p2-p1)*np.dot(p2-p1, p3-p1)/(np.linalg.norm(p2-p1)**2), False)
 
 class CircArc(Entity):
     """
@@ -118,15 +120,15 @@ class CircArc(Entity):
         P = self.transform(np.array([self.x, self.y, self.z]))
         N = self.transform(np.array([0., 0., 1.]), orientation_only=True)
         X = X.reshape(3)
-        v = X - N
+        v = X - P
 
         vparr = np.dot(v, N)/(np.linalg.norm(N)**2)*N
         vperp = v - vparr
-
+        radius = self.radius()
         Xproj = P + vperp
 
         daxial  = np.linalg.norm(vparr)
-        dradial = np.linalg.norm(vperp)-self.radius()
+        dradial = np.linalg.norm(vperp)-radius
         dtoroid = math.hypot(daxial, dradial)
 
         va = (self.transform(np.array([self.x1, self.y1, self.z])) - self.transform(np.array([self.x, self.y, self.z])))
@@ -139,17 +141,18 @@ class CircArc(Entity):
         while thetaE < 0:
             thetaE += 2*math.pi
 
-        if thetaX <= thetaE:
+        if thetaX > EPSILON and thetaX < thetaE-EPSILON:
             # in the "swept" section
-            return dtoroid
+            pradial = P + radius*vperp/np.linalg.norm(vperp)
+            return (dtoroid, pradial, False)
         elif thetaX-thetaE > 2*math.pi-thetaX:
             # in a sphere close to startpoint
             d = np.linalg.norm(X-self.e1)
-            return d
+            return (d, self.e1, 1)
         else:
             # in a sphere close to endpoint
             d = np.linalg.norm(X-self.e2)
-            return d
+            return (d, self.e2, 2)
 
     def radius(self):
         return math.hypot(self.x1-self.x, self.y1-self.y)
@@ -286,6 +289,18 @@ class CompCurve(Entity):
             else:
                 stack.append(child.arange(dx, endpoint=False))
         return np.hstack(stack)
+
+    def nearestPoint(self, X):
+        mindist = np.inf
+        minpt   = np.empty(3)
+        isnode  = False
+        for child in self.children:
+            dist, pt, isn = child.nearestPoint(X)
+            if dist < mindist:
+                mindist = dist
+                minpt   = pt
+                isnode  = isn
+        return (mindist, minpt, isnode)
 
 class AssociativityInstance(Entity):
     """
